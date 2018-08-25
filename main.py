@@ -42,8 +42,8 @@ def load_vgg(sess, vgg_path):
     layer4_out = graph.get_tensor_by_name(vgg_layer4_out_tensor_name)
     layer7_out = graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
     
-    
     return image_input, keep_prob, layer3_out, layer4_out, layer7_out
+
 tests.test_load_vgg(load_vgg, tf)
 
 
@@ -57,7 +57,21 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     # TODO: Implement function
-    return None
+    conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, padding='same',
+                               kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    output = tf.layers.conv2d_transpose(conv_1x1, num_classes, 4, 2, padding='same',
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    # add 1st skip connection
+    skip_con1 = tf.add(output, vgg_layer4_out)
+    output = tf.layers.conv2d_transpose(skip_con1, num_classes, 4, 2, padding='same',
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    # add 2nd skip connection
+    skip_con2 = tf.add(output, vgg_layer3_out)
+    output = tf.layers.conv2d_transpose(skip_con2, num_classes, 16, 8, padding='same',
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+        
+    return output
+
 tests.test_layers(layers)
 
 
@@ -71,7 +85,19 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
     # TODO: Implement function
-    return None, None, None
+    logits = tf.reshape(nn_last_layer, (-1, num_classes))
+    # when adding l2-regularization, realize that merely passing a regularizer in the arguments of the tf.layers is not enough. 
+    # You also have to manually add all those regularization loss terms to your loss function, otherwise they are not doing 
+    # anything. I didn’t know this at first and thought I’m doing l2-regularization when I actually wasn’t. 
+    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits, correct_label))
+#     reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+#     reg_constant = 1  # Choose an appropriate one.
+#     cost = cross_entropy_loss + reg_constant * sum(reg_losses)
+#     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(cost)
+    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
+    
+    return logits, optimizer, cross_entropy_loss
+
 tests.test_optimize(optimize)
 
 
@@ -91,6 +117,19 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
+    for epoch in epochs:
+        epoch_cost = 0. 
+        for image, label in get_batches_fn(batch_size):
+            feed_dict = {
+                learning_rate: 0.0001, 
+                keep_prob: 0.5,
+                input_image:image, 
+                correct_label:label}
+            _ , minibatch_cost = sess.run([train_op, cross_entropy_loss], feed_dict=feed_dict)
+            
+            epoch_cost += minibatch_cost / batch_size
+            print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
+    
     pass
 tests.test_train_nn(train_nn)
 
@@ -100,6 +139,7 @@ def run():
     image_shape = (160, 576)
     data_dir = './data'
     runs_dir = './runs'
+    model_dir = './model'
     tests.test_for_kitti_dataset(data_dir)
 
     # Download pretrained vgg model
@@ -119,13 +159,28 @@ def run():
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         # TODO: Build NN using load_vgg, layers, and optimize function
-
+        correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes], name='correct_label')
+        learning_rate = tf.placeholder(tf.float32, name='learning_rate')
+        
+        input_image, keep_prob, layer3_out, layer4_out, layer7_out = load_vgg(sess, vgg_path)
+        layer_output = layers(layer3_out, layer4_out, layer7_out, num_classes)
+        logits, optimizer, cross_entropy_loss = optimize(layer_output, correct_label, learning_rate, num_classes)
+            
         # TODO: Train NN using the train_nn function
+        epochs = 48 
+        batch_size = 4
+        saver = tf.train.Saver() 
+        
+        train_nn(sess, epochs, batch_size, get_batches_fn, optimizer, cross_entropy_loss, input_image,
+             correct_label, keep_prob, learning_rate)
 
         # TODO: Save inference data using helper.save_inference_samples
         #  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
         # OPTIONAL: Apply the trained model to a video
+        helper.save_inference_samples(model_dir, runs_dir, data_dir, sess, 
+                                      image_shape, logits, keep_prob, input_image, saver)
+
 
 
 if __name__ == '__main__':
