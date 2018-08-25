@@ -5,7 +5,6 @@ import helper
 import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
-from tensorflow.python.framework import ops
 
 
 # Check TensorFlow Version
@@ -154,7 +153,7 @@ def run():
     # OPTIONAL: Train and Inference on the cityscapes dataset instead of the Kitti dataset.
     # You'll need a GPU with at least 10 teraFLOPS to train on.
     #  https://www.cityscapes-dataset.com/
-    ops.reset_default_graph() # to be able to rerun the model without overwriting tf variables
+    tf.reset_default_graph() # to be able to rerun the model without overwriting tf variables
     with tf.Session() as sess:
         # Path to vgg model
         vgg_path = os.path.join(data_dir, 'vgg')
