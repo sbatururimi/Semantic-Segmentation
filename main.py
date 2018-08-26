@@ -94,13 +94,14 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     # You also have to manually add all those regularization loss terms to your loss function, otherwise they are not doing 
     # anything. I didn’t know this at first and thought I’m doing l2-regularization when I actually wasn’t. 
     cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label))
-#     reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-#     reg_constant = 1  # Choose an appropriate one.
-#     cost = cross_entropy_loss + reg_constant * sum(reg_losses)
-#     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(cost)
-    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
+    reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+    reg_constant = 1  # Choose an appropriate one.
+    cost = cross_entropy_loss + reg_constant * sum(reg_losses)
+    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(cost)
+#     optimizer = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
     
-    return logits, optimizer, cross_entropy_loss
+#     return logits, optimizer, cross_entropy_loss
+    return logits, optimizer, cost
 
 tests.test_optimize(optimize)
 
@@ -133,7 +134,9 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
             _ , minibatch_cost = sess.run([train_op, cross_entropy_loss], feed_dict=feed_dict)
             
             epoch_cost += minibatch_cost / batch_size
-            print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
+            if epoch % 20 == 0:
+                
+                print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
     
     print('Trained...')
 tests.test_train_nn(train_nn)
@@ -145,6 +148,10 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     model_dir = './model'
+    
+    if not os.path.exists(runs_dir):
+        os.makedirs(runs_dir)
+    
     tests.test_for_kitti_dataset(data_dir)
 
     # Download pretrained vgg model
@@ -172,8 +179,8 @@ def run():
         logits, optimizer, cross_entropy_loss = optimize(layer_output, correct_label, learning_rate, num_classes)
             
         # TODO: Train NN using the train_nn function
-        epochs = 48 
-        batch_size = 4
+        epochs = 100 
+        batch_size = 32
         
         sess.run(tf.global_variables_initializer())
         train_nn(sess, epochs, batch_size, get_batches_fn, optimizer, cross_entropy_loss, input_image,
