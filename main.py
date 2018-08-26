@@ -25,7 +25,6 @@ def load_vgg(sess, vgg_path):
     :param vgg_path: Path to vgg folder, containing "variables/" and "saved_model.pb"
     :return: Tuple of Tensors from VGG model (image_input, keep_prob, layer3_out, layer4_out, layer7_out)
     """
-    # TODO: Implement function
     #   Use tf.saved_model.loader.load to load the model and weights
     vgg_tag = 'vgg16'
     vgg_input_tensor_name = 'image_input:0'
@@ -96,7 +95,6 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :param num_classes: Number of classes to classify
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
-    # TODO: Implement function
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
     correct_label = tf.reshape(correct_label, (-1,num_classes))
     # when adding l2-regularization, realize that merely passing a regularizer in the arguments of the tf.layers is not enough. 
@@ -111,7 +109,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
 #     train_op = optimizer.minimize(cross_entropy_loss)
     
     return logits, train_op, cost
-#     return logits, optimizer, cost
+#     return logits, train_op, cross_entropy_loss
 
 tests.test_optimize(optimize)
 
@@ -131,7 +129,6 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param keep_prob: TF Placeholder for dropout keep probability
     :param learning_rate: TF Placeholder for learning rate
     """
-    # TODO: Implement function
     for epoch in range(epochs):
         epoch_cost = 0. 
         for image, label in get_batches_fn(batch_size):
@@ -139,13 +136,14 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
                 input_image: image, 
                 correct_label: label,       
                 keep_prob: 0.5,
-                learning_rate: 0.0001}
+                learning_rate: 0.001}
             _ , minibatch_cost = sess.run([train_op, cross_entropy_loss], feed_dict=feed_dict)
             
-#             epoch_cost += minibatch_cost / batch_size
+#             epoch_cost += minibatch_cost / num_batch
 #             if epoch % 10 == 0:                
-#             print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
+#             print ("Epoch Cost after epoch %i: %f" % (epoch, epoch_cost))
             print ("Cost after epoch %i: %f" % (epoch, minibatch_cost))
+            print()
     
     
 tests.test_train_nn(train_nn)
@@ -156,10 +154,7 @@ def run():
     image_shape = (160, 576)
     data_dir = './data'
     runs_dir = './runs'
-    model_dir = './model'
     
-    if not os.path.exists(runs_dir):
-        os.makedirs(runs_dir)
     
     tests.test_for_kitti_dataset(data_dir)
 
@@ -179,7 +174,7 @@ def run():
         # OPTIONAL: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
-        # TODO: Build NN using load_vgg, layers, and optimize function
+        # Build NN using load_vgg, layers, and optimize function
         correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes], name='correct_label')
         learning_rate = tf.placeholder(tf.float32, name='learning_rate')
         
@@ -187,7 +182,7 @@ def run():
         layer_output = layers(layer3_out, layer4_out, layer7_out, num_classes)
         logits, train_op, cross_entropy_loss = optimize(layer_output, correct_label, learning_rate, num_classes)
             
-        # TODO: Train NN using the train_nn function
+        # Train NN using the train_nn function
         epochs = 20 
         batch_size = 64
         
@@ -195,16 +190,10 @@ def run():
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
              correct_label, keep_prob, learning_rate)
 
-        # TODO: Save inference data using helper.save_inference_samples
+        # Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
         # OPTIONAL: Apply the trained model to a video
-
-
-
-
-
-
 
 
 
